@@ -1,0 +1,1 @@
+Adicionando uma instrução "exit(status)" no final da verificação "if(fork() == 0)" iria garantir que apenas fossem criados 4 processos.

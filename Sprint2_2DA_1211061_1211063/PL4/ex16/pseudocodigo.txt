@@ -1,0 +1,232 @@
+Padrões:
+
+O padrão mais notório que foi utilizado na resolução deste código foi o da Sincronização de Execução.
+
+Pseudocódigo:
+
+// Constants
+DEFINE INITIAL 10000
+DEFINE FINAL 1000
+
+// Struct definition
+STRUCT Vectors
+    INT initial_vector[INITIAL]
+    INT final_vector[FINAL]
+    INT max
+END STRUCT
+
+FUNCTION main()
+    // Create shared memory
+    INT data_size = size_of(Vectors)
+    INT fd = shm_open("/shm_test", O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR)
+    ftruncate(fd, data_size)
+    Vectors *vector = (Vectors *)mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+    vector->max = 0
+
+    // Create and initialize semaphores
+    SEMAPHORE sem_max
+    SEMAPHORE sem_avg1
+    SEMAPHORE sem_avg2
+    SEMAPHORE sem_avg3
+    SEMAPHORE sem_avg4
+    SEMAPHORE sem_avg5
+
+    IF sem_open("/sem_max", O_CREAT | O_EXCL, 0644, 0) == SEM_FAILED THEN
+        PRINT "Error creating semaphore"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/sem_avg1", O_CREAT | O_EXCL, 0644, 0) == SEM_FAILED THEN
+        PRINT "Error creating semaphore"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/sem_avg2", O_CREAT | O_EXCL, 0644, 0) == SEM_FAILED THEN
+        PRINT "Error creating semaphore"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/sem_avg3", O_CREAT | O_EXCL, 0644, 0) == SEM_FAILED THEN
+        PRINT "Error creating semaphore"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/sem_avg4", O_CREAT | O_EXCL, 0644, 0) == SEM_FAILED THEN
+        PRINT "Error creating semaphore"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/sem_avg5", O_CREAT | O_EXCL, 0644, 0) == SEM_FAILED THEN
+        PRINT "Error creating semaphore"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    // Generate a new seed
+    srand(time(NULL) + getpid())
+
+    // Fill the initial vector with random values
+    FOR i = 0 TO INITIAL
+        vector->initial_vector[i] = rand() % 10000
+    END FOR
+
+    // Variable initializations
+    pid_t pid
+    INT average
+    INT adjustment = 0
+
+    // Create child processes
+    FOR i = 0 TO 6
+        IF fork() == -1 THEN
+            PRINT "Error creating child process"
+            EXIT(EXIT_FAILURE)
+        END IF
+
+        IF pid == 0 THEN
+            SWITCH i
+                CASE 0:
+                    FOR j = 0 + (i * 2000) TO 2000 + (i * 2000) STEP 10
+                        average = 0
+
+                        FOR k = j TO j + 10
+                            average += vector->initial_vector[k]
+                        END FOR
+
+                        average /= 10
+
+                        adjustment = j / 10
+
+                        up(sem_max)
+                        vector->final_vector[adjustment] = average
+                        up(sem_avg2)
+                    END FOR
+
+                    EXIT(EXIT_SUCCESS)
+                CASE 1:
+                    FOR j = 0 + (i * 2000) TO 2000 + (i * 2000) STEP 10
+                        down(sem_avg2)
+
+                        average = 0
+
+                        FOR k = j TO j + 10
+                            average += vector->initial_vector[k]
+                        END FOR
+
+                        average /= 10
+
+                        adjustment = j / 10
+
+                        up(sem_max)
+                        vector->final_vector[adjustment] = average
+                        up(sem_avg3)
+                    END FOR
+
+                    EXIT(EXIT_SUCCESS)
+                CASE 2:
+                    FOR j = 0 + (i * 2000) TO 2000 + (i * 2000) STEP 10
+                        down(sem_avg3)
+
+                        average = 0
+
+                        FOR k = j TO j + 10
+                            average += vector->initial_vector[k]
+                        END FOR
+
+                        average /= 10
+
+                        adjustment = j / 10
+
+                        up(sem_max)
+                        vector->final_vector[adjustment] = average
+                        up(sem_avg4)
+                    END FOR
+
+                    EXIT(EXIT_SUCCESS)
+                CASE 3:
+                    FOR j = 0 + (i * 2000) TO 2000 + (i * 2000) STEP 10
+                        down(sem_avg4)
+
+                        average = 0
+
+                        FOR k = j TO j + 10
+                            average += vector->initial_vector[k]
+                        END FOR
+
+                        average /= 10
+
+                        adjustment = j / 10
+
+                        up(sem_max)
+                        vector->final_vector[adjustment] = average
+                        up(sem_avg5)
+                    END FOR
+
+                    EXIT(EXIT_SUCCESS)
+                CASE 4:
+                    FOR j = 0 + (i * 2000) TO 2000 + (i * 2000) STEP 10
+                        down(sem_avg5)
+
+                        average = 0
+
+                        FOR k = j TO j + 10
+                            average += vector->initial_vector[k]
+                        END FOR
+
+                        average /= 10
+
+                        adjustment = j / 10
+
+                        up(sem_max)
+                        vector->final_vector[adjustment] = average
+                        up(sem_avg1)
+                    END FOR
+
+                    EXIT(EXIT_SUCCESS)
+                CASE 5:
+                    FOR j = 0 TO FINAL
+                        down(sem_max)
+
+                        IF vector->final_vector[j] > vector->max THEN
+                            vector->max = vector->final_vector[j]
+                            PRINT "New larger value found: " + vector->max
+                        END IF
+                    END FOR
+
+                    EXIT(EXIT_SUCCESS)
+            END SWITCH
+        END IF
+    END FOR
+
+    // Parent process waits for the children
+    FOR i = 0 TO 6
+        wait(NULL)
+    END FOR
+
+    // Print the final vector and the maximum value found
+    PRINT "\nFinal vector:"
+    FOR i = 0 TO FINAL
+        PRINT "Final[" + i + "] - " + vector->final_vector[i]
+    END FOR
+
+    PRINT "\nMax value: " + vector->max
+
+    // Free shared memory
+    munmap(vector, data_size)
+    close(fd)
+    shm_unlink("/shm_test")
+
+    // Close semaphores
+    sem_close(sem_avg1)
+    sem_unlink("/sem_avg1")
+    sem_close(sem_avg2)
+    sem_unlink("/sem_avg2")
+    sem_close(sem_avg3)
+    sem_unlink("/sem_avg3")
+    sem_close(sem_avg4)
+    sem_unlink("/sem_avg4")
+    sem_close(sem_avg5)
+    sem_unlink("/sem_avg5")
+    sem_close(sem_max)
+    sem_unlink("/sem_max")
+
+    RETURN SUCCESS
+END FUNCTION

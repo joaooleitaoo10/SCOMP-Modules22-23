@@ -1,0 +1,1 @@
+Não é necessário nenhum mecanismo de sincronização de processos, uma vez que o processo pai espera que o processo filho termine antes de ler do pipe.

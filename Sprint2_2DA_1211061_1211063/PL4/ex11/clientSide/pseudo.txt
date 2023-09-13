@@ -1,0 +1,64 @@
+// Constants
+constant SEM_SELLER_AVAILABILITY_NAME = "/sem_seller_availibility"
+constant SEM_TICKET_BOUGHT_NAME = "/sem_ticket_bought"
+constant TICKETS_SHM_NAME = "/tickets_shm"
+constant N_CLIENTS = 25
+
+// Data Structure
+structure Tickets:
+    integer ticketNumber
+
+// Main Function
+function main():
+    // Open the semaphores
+    sem_seller_availibility = open_semaphore(SEM_SELLER_AVAILABILITY_NAME)
+    if sem_seller_availibility is failed:
+        print "Error: Client side app couldn't open the seller availability semaphore!"
+        exit
+
+    sem_ticket_bought = open_semaphore(SEM_TICKET_BOUGHT_NAME)
+    if sem_ticket_bought is failed:
+        print "Error: Client side app couldn't open the ticket bought semaphore!"
+        exit
+
+    // Create the shared memory for the tickets
+    data_size = size_of(Tickets)
+
+    fd = create_shared_memory(TICKETS_SHM_NAME)
+    if fd is -1:
+        print "Error: Client side app couldn't create shared memory area!"
+        exit
+
+    tickets = map_shared_memory(fd, data_size)
+    if tickets is failed:
+        print "Error: Client side app couldn't map shared memory area!"
+        exit
+
+    // Create the actual clients
+    for i = 0 to N_CLIENTS-1:
+        pid = fork()
+
+        if pid == 0:
+            // Wait a random amount of time from 1 - 10 seconds (time to be served)
+            waitTime = generate_random_number(1, 10)
+            sleep(waitTime)
+
+            // Wait for the seller to be available
+            wait_for_semaphore(sem_seller_availibility)
+
+            // Buy the ticket
+            print "Client " + getpid() + " bought ticket " + tickets.ticketNumber
+
+            // Signal the seller that the ticket was bought
+            signal_semaphore(sem_ticket_bought)
+
+            exit
+
+    // Wait for all the clients to finish
+    for i = 0 to N_CLIENTS-1:
+        wait()
+
+    // Unmap the shared memory
+    unmap_shared_memory(tickets, data_size)
+
+    return 0

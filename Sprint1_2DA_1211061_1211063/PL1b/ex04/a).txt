@@ -1,0 +1,1 @@
+A função sigaction() permite ter mais controlo sobre a forma como os sinais são manipulados pois permite especificar um conjunto de flags que alteram o comportamento do signal handler. Por isso mesmo, a funçao sigaction() é melhor para tratar sinais.

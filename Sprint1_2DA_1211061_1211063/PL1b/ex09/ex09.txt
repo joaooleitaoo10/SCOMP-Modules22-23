@@ -1,0 +1,14 @@
+b) As expected, the program was terminated as it recieved the SIGINT signal by performing the 
+CTRL-C action. The output message was:
+make: *** [Makefile:14: r] Interrupt
+
+d) The process was terminated. It recieved the signal SIGQUIT because of the performed CTRL-\
+action. The output message was:
+make: *** [Makefile:14: r] Quit
+
+f) The process didn't stopped. It responded with the sigint handler: "I won’t let the process end with CTRL-C!"
+
+g) The process didn't stopped. It responded with the sigquit handler: "I won’t let the process end with CTRL-\!"
+
+h) The %1 is the index reference to the job that we are killing, let's say there are 6 jobs 
+stopped, if i want to kill the 5th I would do a kill %5.

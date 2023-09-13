@@ -1,0 +1,135 @@
+// Define constants
+TRAIN_CAPACITY = 20
+MOVE_TROUGH_DOOR_TIME_MS = 200
+INIT_PASSENGERS = 15
+WANT_TO_LEAVE_AT_A = 5
+WANT_TO_ENTER_AT_A = 20
+WANT_TO_LEAVE_AT_B = 10
+WANT_TO_ENTER_AT_B = 5
+
+// Define data structures
+TrainData:
+    n_passengers
+    departured
+    want_to_leave
+
+Init:
+    inits
+
+// Define semaphores
+sem_train_data
+sem_want_to_leave
+sem_ride
+door_mutex[3]
+sem_train_arrival
+sem_all_passengers_left
+sem_init_data
+
+// Define shared memory variables
+train_data
+init_data
+
+// Function to send the train
+send_train():
+    Wait for all doors to be available
+    Set departured flag to 1
+    Print "The train is full! It is now departing!"
+    Signal sem_ride and sem_train_data
+    Make all doors available
+
+// Function to simulate passenger entering the train
+passenger_enter_train(passenger_id):
+    Wait for access to train_data
+    If train is full and not departed and no passengers want to leave:
+        Call send_train() and exit
+    Else if train is full and not departed:
+        Release train_data and return -1
+    Else if train is full and departed:
+        Release train_data and exit
+    Increment n_passengers
+    Randomly select a door to enter
+    Wait for access to the selected door
+    Simulate moving through the door
+    Print "Passenger entered the train through Door X"
+    Release train_data and the selected door
+    Return the selected door
+
+// Function to simulate passenger leaving the train
+passenger_leave_train(passenger_id, door):
+    Wait for access to the selected door
+    Simulate moving through the door
+    Print "Passenger just left the train! Door: X"
+    Release the selected door
+    Wait for access to train_data
+    Decrement n_passengers
+    Release train_data
+
+// Function to simulate the train trip
+simulate_train_trip():
+    Seed the random number generator
+    Initialize 15 passengers (create 15 processes)
+    If passenger process:
+        Call passenger_enter_train() and handle return value
+        Wait for train to arrive at Station A
+        If passengers want to leave:
+            Call passenger_leave_train()
+            Decrement passengers want_to_leave
+            If no passengers want to leave:
+                Signal sem_all_passengers_left
+        Decrement passengers want_to_leave
+        If train arrives at Station B:
+            Call passenger_leave_train()
+            Decrement passengers want_to_leave
+            If no passengers want to leave:
+                Signal sem_all_passengers_left
+        Decrement passengers want_to_leave
+        Exit
+    Else (train process):
+        Wait for all INIT passengers to enter the train
+        Print "The train just arrived at Station A!"
+        Set passengers want_to_leave to WANT_TO_LEAVE_AT_A
+        Signal sem_train_arrival
+        Wait for passengers to leave the train
+        Wait for train arrival semaphore
+        Create additional passengers to enter the train at Station A
+        For each additional passenger:
+            Call passenger_enter_train()
+        If train is ready to leave:
+            Signal sem_ride
+        Print "Traveling..."
+        Sleep for a while
+        Print "The train just arrived at Station B!"
+        Set passengers want_to_leave to WANT_TO_LEAVE_AT_B
+        Signal sem_train_arrival
+        Wait for passengers to leave the train
+        Create additional passengers to enter the train at Station B
+        For each additional passenger:
+            Call passenger_enter_train()
+        If train is ready to leave:
+            Signal sem_ride
+        Print "Traveling..."
+        Sleep for a while
+        Print "The train has returned to Station A!"
+        Set passengers want_to_leave to WANT_TO_LEAVE_AT_A
+        Signal sem_train_arrival
+        Wait for passengers to leave the train
+        Create additional passengers to enter the train at Station A
+        For each additional passenger:
+            Call passenger_enter_train()
+        If train is ready to leave:
+            Signal sem_ride
+        Print "Traveling..."
+        Sleep for a while
+        Wait for passengers to leave the train
+        Print "All passengers have left the train!"
+        Signal sem_all_passengers_left
+        Exit
+
+// Main function
+main():
+    Create semaphores and shared memory
+    Initialize train_data and init_data
+    Create passenger processes
+    Create train process
+    Wait for all processes to finish
+    Close and unlink semaphores and shared memory

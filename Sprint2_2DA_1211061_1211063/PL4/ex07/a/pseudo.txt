@@ -1,0 +1,40 @@
+PROCEDURE main():
+    // Declare the necessary variables
+    pid1: Process ID
+    sem_beer, sem_chips: Semaphores
+
+    // Create the semaphores for the chips and for the beer
+    sem_beer = CreateSemaphore("sem1", 0)
+    sem_chips = CreateSemaphore("sem2", 0)
+
+    // Process 2
+    pid1 = ForkChild()
+    IF pid1 = 0 THEN
+        // Sleep random time between 0 and 5 seconds
+        srand(GetProcessId())
+        Sleep(Rand() % 6)
+        Print("P2: Just bought beer!\n")
+        Signal(sem_beer)
+        Wait(sem_chips)
+        Print("P2: Eating and drinking!\n")
+        ExitProcess(EXIT_SUCCESS)
+
+    // Process 1
+    // Sleep random time between 0 and 2 seconds
+    srand(GetProcessId())
+    Sleep(Rand() % 3)
+    Print("P1: Just bought chips!\n")
+    Signal(sem_chips)
+    Wait(sem_beer)
+    Print("P1: Eating and drinking!\n")
+
+    // Wait for child process to complete
+    WaitForChild(NULL)
+
+    // Close and unlink the semaphores
+    CloseSemaphore(sem_beer)
+    CloseSemaphore(sem_chips)
+    UnlinkSemaphore("sem1")
+    UnlinkSemaphore("sem2")
+
+    ExitProgram(0)

@@ -1,0 +1,118 @@
+Padrões:
+Os padrões utilizados na resolução deste problema foram o do Produtor/Consumidor e a Sincronização de Execução.
+
+Pseudocódigo:
+
+// Constants
+DEFINE NR_INTS = 10
+DEFINE NR_EXCHANGED = 30
+DEFINE NR_PRODUCERS = 2
+
+// Struct definition
+STRUCT Circular_buffer
+    INT numbers[NR_INTS]
+    INT writerIdx
+    INT readerIdx
+END STRUCT
+
+FUNCTION main()
+    // Create shared memory
+    INT data_size = size_of(Circular_buffer)
+    INT fd = shm_open("/shm_test", O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR)
+    ftruncate(fd, data_size)
+    Circular_buffer *myBuffer = (Circular_buffer *)mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+
+    // Create semaphores for the circular buffer
+    SEMAPHORE mutex
+    SEMAPHORE full
+    SEMAPHORE empty
+
+    IF sem_open("/sem_ex12_mutex", O_CREAT | O_EXCL, 0644, 1) == SEM_FAILED THEN
+        PRINT "Error at sem_open()."
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/sem_ex12_full", O_CREAT | O_EXCL, 0644, 0) == SEM_FAILED THEN
+        PRINT "Error at sem_open()."
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/sem_ex12_empty", O_CREAT | O_EXCL, 0644, NR_INTS) == SEM_FAILED THEN
+        PRINT "Error at sem_open()."
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    // Variable initializations
+    myBuffer->readerIdx = 0
+    myBuffer->writerIdx = 0
+    pid_t pid
+
+    // Create child processes (producers)
+    FOR i = 0 TO NR_PRODUCERS
+        IF fork() == -1 THEN
+            PRINT "Error creating child process"
+            EXIT(EXIT_FAILURE)
+        ELSE IF pid == 0 THEN
+            // Child processes (producers)
+            srand(time(NULL) + getpid())
+
+            FOR j = i TO NR_EXCHANGED STEP NR_PRODUCERS
+                // Wait for the buffer to be empty
+                down(empty)
+                down(mutex)
+
+                // Write to the buffer
+                myBuffer->numbers[myBuffer->writerIdx] = j
+                PRINT "Producer wrote:", myBuffer->numbers[myBuffer->writerIdx]
+
+                // Update the writer index
+                myBuffer->writerIdx = (myBuffer->writerIdx + 1) % NR_INTS
+
+                // Release the buffer and signal that it is full
+                up(mutex)
+                up(full)
+
+                sleep(1) // Wait for 1 second
+            END FOR
+
+            EXIT(EXIT_SUCCESS)
+        END IF
+    END FOR
+
+    // Parent process (consumer)
+    FOR i = 0 TO NR_EXCHANGED
+        // Wait for the buffer to be full
+        down(full)
+        down(mutex)
+
+        // Read from the buffer
+        PRINT "Consumer read:", myBuffer->numbers[myBuffer->readerIdx]
+
+        // Update the reader index
+        myBuffer->readerIdx = (myBuffer->readerIdx + 1) % NR_INTS
+
+        // Release the buffer and signal that it is empty
+        up(mutex)
+        up(empty)
+
+        sleep(2) // Wait for 2 seconds
+    END FOR
+
+    // Parent waits for the child processes
+    wait(NULL)
+
+    // Close the shared memory
+    munmap(myBuffer, data_size)
+    close(fd)
+    shm_unlink("/shm_test")
+
+    // Close the semaphores
+    sem_close(mutex)
+    sem_unlink("/sem_ex12_mutex")
+    sem_close(full)
+    sem_unlink("/sem_ex12_full")
+    sem_close(empty)
+    sem_unlink("/sem_ex12_empty")
+
+    RETURN SUCCESS
+END FUNCTION

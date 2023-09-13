@@ -1,0 +1,280 @@
+// Define constants
+DEFINE VIP_QUEUE_MUTEX = "/sem_vip_queue_mutex"
+DEFINE SPECIAL_QUEUE_MUTEX = "/sem_special_queue_mutex"
+DEFINE NORMAL_QUEUE_MUTEX = "/sem_normal_queue_mutex"
+DEFINE SEM_VIP_QUEUE = "/sem_vip_queue"
+DEFINE SEM_SPECIAL_QUEUE = "/sem_special_queue"
+DEFINE SEM_NORMAL_QUEUE = "/sem_normal_queue"
+DEFINE SEM_CLUB_ENTRIES = "/sem_club_entry"
+DEFINE VIP_QUEUE_SHM_NAME = "/vip_queue_shm"
+DEFINE SPECIAL_QUEUE_SHM_NAME = "/special_queue_shm"
+DEFINE NORMAL_QUEUE_SHM_NAME = "/normal_queue_shm"
+DEFINE CLUB_ENTRIES_SHM_NAME = "/club_entries_shm"
+DEFINE CLUB_ENTRIES_MUTEX = "/sem_club_entries_mutex"
+
+DEFINE N_CLIENTS = 30
+DEFINE N_CLUB_CAPACITY = 3
+DEFINE VIP_PROBABILITY = 15
+DEFINE SPECIAL_PROBABILITY = 25
+DEFINE NORMAL_PROBABILITY = 60
+
+DEFINE GREEN = "\033[0;32m"
+DEFINE BLUE = "\033[0;34m"
+DEFINE YELLOW = "\033[0;33m"
+DEFINE PURPLE = "\033[0;35m"
+
+// Define structures
+STRUCT VipQueue
+    INT totalClients
+
+STRUCT SpecialQueue
+    INT totalClients
+
+STRUCT NormalQueue
+    INT totalClients
+
+STRUCT ClubEntries
+    INT totalEntries
+
+// Declare variables
+DECLARE clubEntries AS POINTER TO ClubEntries
+DECLARE vipQueue AS POINTER TO VipQueue
+DECLARE specialQueue AS POINTER TO SpecialQueue
+DECLARE normalQueue AS POINTER TO NormalQueue
+DECLARE sem_vip_queue AS POINTER TO Semaphore
+DECLARE sem_special_queue AS POINTER TO Semaphore
+DECLARE sem_normal_queue AS POINTER TO Semaphore
+DECLARE sem_vip_queue_mutex AS POINTER TO Semaphore
+DECLARE sem_special_queue_mutex AS POINTER TO Semaphore
+DECLARE sem_normal_queue_mutex AS POINTER TO Semaphore
+DECLARE sem_club_entries AS POINTER TO Semaphore
+DECLARE sem_club_entries_mutex AS POINTER TO Semaphore
+
+// Function to initialize shared memory
+FUNCTION initializeSharedMemory()
+    // Create shared memory for club entries
+    INT data_size = SIZEOF(ClubEntries)
+    INT fd = shm_open(CLUB_ENTRIES_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR)
+    IF fd == -1
+        PRINT "Error: Couldn't create the shared memory area"
+        EXIT
+
+    ftruncate(fd, data_size)
+    IF ftruncate(fd, data_size) == -1
+        PRINT "Error: Couldn't truncate shared memory area!"
+        EXIT
+
+    clubEntries = mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+    IF clubEntries == MAP_FAILED
+        PRINT "Error: Couldn't map shared memory area!"
+        EXIT
+
+    clubEntries.totalEntries = 0
+
+    // Create shared memory for VIP queue
+    data_size = SIZEOF(VipQueue)
+    fd = shm_open(VIP_QUEUE_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR)
+    IF fd == -1
+        PRINT "Error: Couldn't create the shared memory area"
+        EXIT
+
+    ftruncate(fd, data_size)
+    IF ftruncate(fd, data_size) == -1
+        PRINT "Error: Couldn't truncate shared memory area!"
+        EXIT
+
+    vipQueue = mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+    IF vipQueue == MAP_FAILED
+        PRINT "Error: Couldn't map shared memory area!"
+        EXIT
+
+    vipQueue.totalClients = 0
+
+    // Create shared memory for special queue
+    data_size = SIZEOF(SpecialQueue)
+    fd = shm_open(SPECIAL_QUEUE_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR)
+    IF fd == -1
+        PRINT "Error: Couldn't create the shared memory area"
+        EXIT
+
+    ftruncate(fd, data_size)
+    IF ftruncate(fd, data_size) == -1
+        PRINT "Error: Couldn't truncate shared memory area!"
+        EXIT
+
+    specialQueue = mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+    IF specialQueue == MAP_FAILED
+        PRINT "Error: Couldn't map shared memory area!"
+        EXIT
+
+    specialQueue.totalClients = 0
+
+    // Create shared memory for normal queue
+    data_size = SIZEOF(NormalQueue)
+    fd = shm_open(NORMAL_QUEUE_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR)
+    IF fd == -1
+        PRINT "Error: Couldn't create the shared memory area"
+        EXIT
+
+    ftruncate(fd, data_size)
+    IF ftruncate(fd, data_size) == -1
+        PRINT "Error: Couldn't truncate shared memory area!"
+        EXIT
+
+    normalQueue = mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+    IF normalQueue == MAP_FAILED
+        PRINT "Error: Couldn't map shared memory area!"
+        EXIT
+
+    normalQueue.totalClients = 0
+
+    // Create semaphores
+    sem_vip_queue_mutex = sem_open(VIP_QUEUE_MUTEX, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, 1)
+    sem_special_queue_mutex = sem_open(SPECIAL_QUEUE_MUTEX, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, 1)
+    sem_normal_queue_mutex = sem_open(NORMAL_QUEUE_MUTEX, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, 1)
+    sem_vip_queue = sem_open(SEM_VIP_QUEUE, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, 0)
+    sem_special_queue = sem_open(SEM_SPECIAL_QUEUE, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, 0)
+    sem_normal_queue = sem_open(SEM_NORMAL_QUEUE, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, 0)
+    sem_club_entries = sem_open(SEM_CLUB_ENTRIES, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, N_CLUB_CAPACITY)
+    sem_club_entries_mutex = sem_open(CLUB_ENTRIES_MUTEX, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR, 1)
+
+    IF sem_vip_queue_mutex == SEM_FAILED OR sem_special_queue_mutex == SEM_FAILED OR sem_normal_queue_mutex == SEM_FAILED
+        PRINT "Error: Couldn't create the mutex semaphore"
+        EXIT
+
+    IF sem_vip_queue == SEM_FAILED OR sem_special_queue == SEM_FAILED OR sem_normal_queue == SEM_FAILED
+        PRINT "Error: Couldn't create the empty semaphore"
+        EXIT
+
+    IF sem_club_entries == SEM_FAILED OR sem_club_entries_mutex == SEM_FAILED
+        PRINT "Error: Couldn't create the club entries semaphore"
+        EXIT
+
+// Function to destroy shared memory and semaphores
+FUNCTION destroyResources()
+    munmap(clubEntries, SIZEOF(ClubEntries))
+    munmap(vipQueue, SIZEOF(VipQueue))
+    munmap(specialQueue, SIZEOF(SpecialQueue))
+    munmap(normalQueue, SIZEOF(NormalQueue))
+
+    shm_unlink(CLUB_ENTRIES_SHM_NAME)
+    shm_unlink(VIP_QUEUE_SHM_NAME)
+    shm_unlink(SPECIAL_QUEUE_SHM_NAME)
+    shm_unlink(NORMAL_QUEUE_SHM_NAME)
+
+    sem_close(sem_vip_queue_mutex)
+    sem_close(sem_special_queue_mutex)
+    sem_close(sem_normal_queue_mutex)
+    sem_close(sem_vip_queue)
+    sem_close(sem_special_queue)
+    sem_close(sem_normal_queue)
+    sem_close(sem_club_entries)
+    sem_close(sem_club_entries_mutex)
+
+    sem_unlink(VIP_QUEUE_MUTEX)
+    sem_unlink(SPECIAL_QUEUE_MUTEX)
+    sem_unlink(NORMAL_QUEUE_MUTEX)
+    sem_unlink(SEM_VIP_QUEUE)
+    sem_unlink(SEM_SPECIAL_QUEUE)
+    sem_unlink(SEM_NORMAL_QUEUE)
+    sem_unlink(SEM_CLUB_ENTRIES)
+    sem_unlink(CLUB_ENTRIES_MUTEX)
+
+// Function for the VIP client process
+FUNCTION vipClientProcess()
+    sem_wait(sem_vip_queue_mutex)
+    vipQueue.totalClients += 1
+    sem_post(sem_vip_queue_mutex)
+
+    PRINT GREEN + "VIP Client entered the queue"
+
+    sem_post(sem_vip_queue)
+
+    // Wait for club entry
+    sem_wait(sem_club_entries)
+
+    sem_wait(sem_vip_queue_mutex)
+    vipQueue.totalClients -= 1
+    sem_post(sem_vip_queue_mutex)
+
+    sem_post(sem_club_entries_mutex)
+
+    PRINT GREEN + "VIP Client entered the club"
+
+    EXIT
+
+// Function for the special client process
+FUNCTION specialClientProcess()
+    sem_wait(sem_special_queue_mutex)
+    specialQueue.totalClients += 1
+    sem_post(sem_special_queue_mutex)
+
+    PRINT YELLOW + "Special Client entered the queue"
+
+    sem_post(sem_special_queue)
+
+    // Wait for club entry
+    sem_wait(sem_club_entries)
+
+    sem_wait(sem_special_queue_mutex)
+    specialQueue.totalClients -= 1
+    sem_post(sem_special_queue_mutex)
+
+    sem_post(sem_club_entries_mutex)
+
+    PRINT YELLOW + "Special Client entered the club"
+
+    EXIT
+
+// Function for the normal client process
+FUNCTION normalClientProcess()
+    sem_wait(sem_normal_queue_mutex)
+    normalQueue.totalClients += 1
+    sem_post(sem_normal_queue_mutex)
+
+    PRINT BLUE + "Normal Client entered the queue"
+
+    sem_post(sem_normal_queue)
+
+    // Wait for club entry
+    sem_wait(sem_club_entries)
+
+    sem_wait(sem_normal_queue_mutex)
+    normalQueue.totalClients -= 1
+    sem_post(sem_normal_queue_mutex)
+
+    sem_post(sem_club_entries_mutex)
+
+    PRINT BLUE + "Normal Client entered the club"
+
+    EXIT
+
+// Main function
+FUNCTION main()
+    initializeSharedMemory()
+
+    FOR i = 1 TO N_CLIENTS
+        RANDOMIZE()
+
+        INT probability = RANDOM(100)
+
+        IF probability < VIP_PROBABILITY
+            IF FORK() == 0
+                vipClientProcess()
+        ELSE IF probability < VIP_PROBABILITY + SPECIAL_PROBABILITY
+            IF FORK() == 0
+                specialClientProcess()
+        ELSE
+            IF FORK() == 0
+                normalClientProcess()
+        END IF
+    END FOR
+
+    // Wait for all child processes to finish
+    FOR i = 1 TO N_CLIENTS
+        WAIT(NULL)
+    END FOR
+
+    destroyResources()
+
+    EXIT

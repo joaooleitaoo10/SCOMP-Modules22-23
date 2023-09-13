@@ -1,0 +1,8 @@
+Os dois processos percorrem o mesmo código, e tendo em conta que tanto as variáveis b, c como a d podem variar no seu valor mediante o processo em questão, a única que se mantém com o mesmo valor é a, que vai ter o valor 5 nos dois processos.
+
+EXTRA PARA RETENÇÃO DE INFORMAÇÃO:
+Análise varíavel a variável:
+A variável a vai se manter 5 nos dois processos pois os dois percorrem aquela linha de código.
+A variável b vai receber o id do processo filho no processo pai e vai receber 0 no processo filho.
+A variável c vai receber o id do processo em que está a ser executada.
+A variável d vai receber o id do processo que é pai do processo a ser executado.

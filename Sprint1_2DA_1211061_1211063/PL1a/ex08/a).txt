@@ -1,0 +1,1 @@
+O comando ps vai listar o processo pai e o primeiro filho que aparece no código, pois o processo pai vai fazer o wait do segundo processo filho que aparece no código, mas como fica em loop infinito, não o lista, apesar de todos serem impressos.

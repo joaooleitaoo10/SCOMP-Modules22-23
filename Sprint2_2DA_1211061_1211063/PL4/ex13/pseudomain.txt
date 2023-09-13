@@ -1,0 +1,70 @@
+// Constants
+constant N_READERS = 5
+constant N_WRITERS = 10
+
+// Data Structures
+structure Readers:
+    integer n_readers
+
+structure Writers:
+    integer n_writers
+
+structure ShmArea:
+    character content[100000]
+
+// Shared Memory and Semaphores
+Readers *n_readers
+Writers *n_writers
+ShmArea *shm_area
+sem_t *sem_n_readers
+sem_t *sem_n_writers
+sem_t *sem_reader_critical_section
+sem_t *sem_writer
+sem_t *sem_reader
+
+// Initialize Semaphores and Shared Memory Method
+method initializeProgram()
+
+// Method used to terminate the program, free the memory and semaphores
+method terminateProgram()
+
+// Method used to wait for the reader to be able to access its critical section
+method sem_wait_critical_section()
+
+// Method used to post the reader to be able to access its critical section
+method sem_post_critical_section()
+
+// Method to create a new reader process
+method createReader()
+
+// Method to create a new writer process
+method createWriter()
+
+// Method to wait for all processes to finish
+method waitAll()
+
+// Main Function
+function main():
+    // Initialize the program
+    initializeProgram()
+
+    // Randomly create readers and writers
+    writers = 0
+    readers = 0
+    print "Creation order:"
+    while writers + readers < N_READERS + N_WRITERS:
+        random = generate_random_number(0, 1)
+        if random == 0 and writers < N_WRITERS:
+            createWriter()
+            writers++
+        else if random == 1 and readers < N_READERS:
+            createReader()
+            readers++
+
+    // Wait for all processes to finish
+    waitAll()
+
+    // Terminate the program
+    terminateProgram()
+
+    return 0

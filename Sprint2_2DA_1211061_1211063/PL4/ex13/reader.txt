@@ -1,0 +1,32 @@
+method createReader():
+    // Create a new process
+    pid = fork()
+    if pid == 0:
+        sem_wait_critical_section()
+        n_readers->n_readers++
+        if n_readers->n_readers == 1:
+            sem_wait(sem_writer)
+        sem_post_critical_section()
+
+        // Read the shared memory area
+        content_read = copy_content(shm_area->content)
+
+        sleep(1)
+
+        // Get the number of readers
+        sem_wait(sem_n_readers)
+        n_readers_instant = n_readers->n_readers
+        sem_post(sem_n_readers)
+
+        // Print the content read and the number of readers
+        print_content_read_and_readers(content_read, n_readers_instant)
+
+        // Decrease the number of readers
+        sem_wait(sem_n_readers)
+        n_readers->n_readers--
+        if n_readers->n_readers == 0:
+            sem_post(sem_writer)
+        sem_post(sem_n_readers)
+
+        // Exit the process
+        exit(EXIT_SUCCESS)

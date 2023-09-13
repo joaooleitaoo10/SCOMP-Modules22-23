@@ -1,0 +1,44 @@
+#include header files
+
+define constants:
+    OUT_FILE = "Output.txt"
+    IN_FILE = "Numbers.txt"
+    N_CHILDREN = 8
+    N_NUMBERS = 200
+
+main():
+    Remove the output file if it exists
+    Create two semaphores, semR and semW, with initial values of 1
+
+    for i = 0 to N_CHILDREN - 1:
+        fork a child process
+        if the process is a child:
+            break
+
+    if the process is a child:
+        Open the input file
+        Get the process id
+        for i = 0 to N_NUMBERS - 1:
+            // READ - Stop other children from reading
+            wait on semR
+            Read a number from the input file
+            // Allow other children to read
+            signal semR
+            // READ END
+
+            // WRITE - Stop other children from writing
+            wait on semW
+            Open the output file
+            Write the process id and the number to the output file
+            Close the output file
+            // Allow other children to write
+            signal semW
+            // WRITE END
+
+        Close the input file
+        Print a message indicating that the child has finished
+        Exit the child process
+
+    Wait for all the child processes to finish
+    Destroy the semaphores
+    Exit the program

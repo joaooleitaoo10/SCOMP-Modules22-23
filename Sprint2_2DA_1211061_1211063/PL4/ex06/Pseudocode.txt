@@ -1,0 +1,58 @@
+Padrões:
+O padrão mais notório na resolução deste problema é o das Barreiras.
+
+Pseudocódigo:
+
+FUNCTION down(sem)
+    IF sem_wait(sem) == -1 THEN
+        PRINT "Error decrementing the semaphore!"
+        EXIT with failure
+    END IF
+END FUNCTION
+
+FUNCTION up(sem)
+    IF sem_post(sem) == -1 THEN
+        PRINT "Error incrementing the semaphore!"
+        EXIT with failure
+    END IF
+END FUNCTION
+
+MAIN
+    DECLARE sem_nproc as semaphore pointer
+    DECLARE sem_barrier as semaphore pointer
+    DECLARE pid as process ID
+
+    // Initialize variables
+    sem_nproc = sem_open("sem_ex6_nproc", O_CREAT | O_EXCL, 0644, 2)
+    sem_barrier = sem_open("sem_ex6_barrier", O_CREAT | O_EXCL, 0644, 2)
+
+    IF fork() == -1 THEN
+        PRINT "Fork error!"
+        EXIT with failure
+    END IF
+
+    IF pid == 0 THEN // Child process
+        WHILE true DO
+            down(sem_nproc)
+            PRINT "C"
+            FLUSH stdout
+            up(sem_barrier)
+        END WHILE
+    ELSE // Parent process
+        WHILE true DO
+            down(sem_barrier)
+            PRINT "S"
+            FLUSH stdout
+            up(sem_nproc)
+        END WHILE
+    END IF
+
+    // Close semaphores
+    sem_close(sem_nproc)
+    sem_unlink("sem_ex6_nproc")
+
+    sem_close(sem_barrier)
+    sem_unlink("sem_ex6_barrier")
+
+    RETURN SUCCESS
+END MAIN

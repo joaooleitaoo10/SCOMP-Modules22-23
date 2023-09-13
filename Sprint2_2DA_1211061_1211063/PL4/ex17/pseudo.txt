@@ -1,0 +1,140 @@
+// Constants
+SEM_ALARM_SENS = "/sem_alarm_sens"
+SEM_MEASUREMENTS = "/sem_measurements"
+SEM_NOTIFIER = "/sem_notifier"
+SENSORSDATA_SHM_NAME = "/sensdata_shm"
+N_SENSORS = 5
+N_MEASUREMENTS = 6
+ALARM_VALUE = 50
+
+// Data structure
+SensorsData:
+    totalMeasurements
+    measurements[N_MEASUREMENTS * N_SENSORS]
+    nSensorsInAlarm
+    lastAlarmMessage[100]
+
+// Global variables
+sensorsData: pointer to SensorsData
+sem_alarm_sens: semaphore
+sem_measurements: semaphore
+sem_notifier: semaphore
+
+// Function to initialize shared memory and semaphores
+initializeSharedMemory():
+    // Create or attach to the shared memory segment
+    sensorsData = createSharedMemory(SENSORSDATA_SHM_NAME, size of SensorsData)
+
+initializeSemaphores():
+    // Create or open the semaphores
+    sem_alarm_sens = createSemaphore(SEM_ALARM_SENS, initial value 1)
+    sem_measurements = createSemaphore(SEM_MEASUREMENTS, initial value 1)
+    sem_notifier = createSemaphore(SEM_NOTIFIER, initial value 0)
+
+// Function to simulate sensor execution
+sensorExecution(sensorId):
+    isInAlarmState = 0
+    measurements[N_MEASUREMENTS]
+
+    for i = 0 to N_MEASUREMENTS - 1:
+        generatedValue = generateRandomValue(0, 100)
+        measurements[i] = generatedValue
+
+        // Wait for access to measurements in shared memory
+        semaphoreWait(sem_measurements)
+
+        // Add measurement to shared memory
+        sensorsData->measurements[sensorsData->totalMeasurements] = generatedValue
+
+        // Increment total number of measurements
+        sensorsData->totalMeasurements++
+
+        if i >= 2 and isInAlarmState == 1:
+            if measurements[i] < ALARM_VALUE and measurements[i - 1] < ALARM_VALUE:
+                isInAlarmState = 0
+                sensorsData->nSensorsInAlarm--
+                sensorsData->lastAlarmMessage = "Sensor " + sensorId + " is no longer in alarm state\nLast two measures: " + measurements[i - 1] + ";" + generatedValue
+        else if isInAlarmState == 0 and generatedValue >= ALARM_VALUE:
+            isInAlarmState = 1
+            sensorsData->nSensorsInAlarm++
+            sensorsData->lastAlarmMessage = "Sensor " + sensorId + " is now in alarm state!"
+
+        // Notify the controller about new measurement
+        semaphorePost(sem_notifier)
+
+        sleep(1)
+
+// Function to simulate the sensor application
+sensorApp():
+    for i = 0 to N_SENSORS - 1:
+        pid = fork()
+        if pid == -1:
+            print "Error: Couldn't create sensor " + i
+            exit
+        else if pid == 0:
+            // Child process
+            sensorExecution(i + 1)
+            exit
+
+// Function to wait for sensor processes to finish
+waitSensors():
+    for i = 0 to N_SENSORS - 1:
+        wait(NULL)
+
+// Function to perform clean-up
+cleanUp():
+    // Close the semaphores
+    semaphoreClose(sem_alarm_sens)
+    semaphoreClose(sem_measurements)
+    semaphoreClose(sem_notifier)
+
+    // Unlink the semaphores
+    semaphoreUnlink(SEM_ALARM_SENS)
+    semaphoreUnlink(SEM_MEASUREMENTS)
+    semaphoreUnlink(SEM_NOTIFIER)
+
+    // Unlink the shared memory
+    sharedMemoryUnlink(SENSORSDATA_SHM_NAME)
+
+// Main program
+main():
+    // Initialize shared memory and semaphores
+    initializeSharedMemory()
+    initializeSemaphores()
+
+    // Start the sensor application
+    sensorApp()
+
+    previousNsensorsInAlarmState = 0
+
+    // Wait for notifications from the sensors
+    for i = 0 to N_SENSORS * N_MEASUREMENTS - 1:
+        // Wait for notification
+        semaphoreWait(sem_notifier)
+
+        // Print the received value
+        print "Value received: " + sensorsData->measurements[i]
+
+        // Check for change in number of sensors in alarm state
+        if previousNsensorsInAlarmState != sensorsData->nSensorsInAlarm:
+            // Print the last alarm message
+            print "Last alarm message: " + sensorsData->lastAlarmMessage
+
+            // Print the number of sensors in alarm state
+            print "Number of sensors in alarm state: " + sensorsData->nSensorsInAlarm
+
+            previousNsensorsInAlarmState = sensorsData->nSensorsInAlarm
+
+        // Allow access to measurements in shared memory
+        semaphorePost(sem_measurements)
+
+    // Print the total number of measurements
+    print "Total number of measurements: " + sensorsData->totalMeasurements
+
+    // Wait for sensor processes to finish
+    waitSensors()
+
+    // Clean up semaphores and shared memory
+    cleanUp()
+
+    return 0

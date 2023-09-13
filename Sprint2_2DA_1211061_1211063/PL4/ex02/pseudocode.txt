@@ -1,0 +1,86 @@
+Padrões:
+
+O padrão mais notório utilizado na resolução deste problema foi o do Leitor/Escritor.
+
+Pseudocódigo:
+
+writer.c
+
+DEFINE STRINGS as 50
+DEFINE CHARACTERS as 80
+
+DEFINE shared_data_type as structure with sem as semaphore, array as array of strings, and line_occurrences as integer
+
+MAIN:
+    SET data_size as size of shared_data_type
+    
+    // Create and open shared memory
+    SET fd as shm_open("/shm_test", O_CREAT | O_EXCL | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR)
+    ftruncate(fd, data_size)
+    SET shared_data as mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+    
+    // Initialize shared data
+    shared_data.line_occurrences = 0
+    SET get_pid as getpid()
+    sem_init(&(shared_data.sem), 0, 1)
+    
+    // Write to shared memory
+    FOR i from 0 to STRINGS:
+        sem_wait(&(shared_data.sem))
+        
+        FOR j from 0 to CHARACTERS:
+            IF shared_data.array[i][j] is null character THEN
+                SET shared_data.array[i] as "PID: %d - Line: %d" with values get_pid and i
+                PRINT "I'm the Father - with PID %d" with value getpid()
+                shared_data.line_occurrences++
+                BREAK
+            END IF
+        END FOR
+        
+        sem_post(&(shared_data.sem))
+        
+        SET sleep_time as random number between 1 and 5
+        SLEEP for sleep_time seconds
+    END FOR
+    
+    // Clean up shared memory
+    munmap(shared_data, data_size)
+    close(fd)
+    shm_unlink("/shm_test")
+    
+    RETURN 0
+END MAIN
+
+
+Reader.c
+
+DEFINE STRINGS as 50
+DEFINE CHARACTERS as 80
+
+DEFINE shared_data_type as structure with sem as semaphore, array as array of strings, and line_occurrences as integer
+
+MAIN:
+    SET data_size as size of shared_data_type
+    
+    // Create and open shared memory
+    SET fd as shm_open("/shm_test", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+    SET shared_data as mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+    
+    FOR i from 0 to STRINGS:
+        // Print the information read from shared memory
+        PRINT "Current number of line occurrences: %d" with value shared_data.line_occurrences
+        
+        // Sleep for a random time between 1 and 5 seconds
+        SET sleep_time as random number between 1 and 5
+        SLEEP for sleep_time seconds
+    END FOR
+    
+    PRINT "Final number of line occurrences: %d" with value shared_data.line_occurrences
+    
+    // Clean up shared memory
+    munmap(shared_data, data_size)
+    close(fd)
+    shm_unlink("/shm_test")
+    
+    RETURN 0
+END MAIN

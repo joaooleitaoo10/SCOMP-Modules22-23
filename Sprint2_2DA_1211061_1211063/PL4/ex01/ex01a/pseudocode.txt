@@ -1,0 +1,37 @@
+DEFINE OUT_FILE as "Output.txt"
+DEFINE IN_FILE as "Numbers.txt"
+DEFINE N_CHILDREN as 8
+DEFINE N_NUMBERS as 200
+
+REMOVE the output file if it exists
+
+CREATE a semaphore with name "sem", initial value 1 and permission 0644
+
+FOR each i from 0 to N_CHILDREN-1
+    CREATE a child process
+    IF the process is a child process THEN
+        BREAK the loop
+    END IF
+END FOR
+
+IF the process is a child process THEN
+    OPEN the input file IN_FILE for reading
+    FOR each i from 0 to N_NUMBERS-1
+        WAIT for the semaphore to be available
+        GET the pid value
+        OPEN the output file OUT_FILE for appending
+        READ a number from the input file
+        WRITE the pid and the number to the output file
+        CLOSE the output file
+        SIGNAL the semaphore
+    END FOR
+    CLOSE the input file
+    PRINT "Child <pid> finished"
+    EXIT the child process
+END IF
+
+WAIT for all child processes to finish
+
+DESTROY the semaphore with name "sem"
+
+EXIT the main process

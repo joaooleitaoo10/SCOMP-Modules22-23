@@ -1,0 +1,1 @@
+Ambos os filhos são impressos pelas linhas de código correspondentes, mas apenas um deles é listado, pois ao outro é aplicado o wait pelo processo pai que entra num loop infinito.

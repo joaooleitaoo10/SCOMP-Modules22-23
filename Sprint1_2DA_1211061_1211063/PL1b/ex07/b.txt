@@ -1,0 +1,4 @@
+When implementing signal handlers, it is best to avoid using functions that are not async-signal-safe, such as printf(). This is because such functions can cause issues if a signal is received while their output is being buffered. If a signal handler attempts to call printf() while another thread or signal is still executing it, the outcome can be unpredictable. Instead, it is recommended to use functions like write(), which are async-signal-safe. Since write() writes data directly to a file descriptor and does not rely on internal buffers, it is safe to use in a signal handler.
+
+
+

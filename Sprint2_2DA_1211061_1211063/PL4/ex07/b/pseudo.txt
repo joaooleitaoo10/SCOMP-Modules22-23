@@ -1,0 +1,114 @@
+DEFINE NUM_PROCESSES = 6
+
+STRUCT ShmData
+    barrier_procs: Integer
+END STRUCT
+
+// Declare the necessary variables
+sem_nproc, sem_barrier: Semaphores
+shm: Shared memory of type ShmData
+
+// Buy beer function
+PROCEDURE buy_beer()
+    // Sleep random time between 0 and 5 seconds
+    srand(GetProcessId())
+    Sleep(Rand() % 6)
+    Print("P" + GetProcessId() + ": Just bought beer!\n")
+
+// Buy chips function
+PROCEDURE buy_chips()
+    // Sleep random time between 0 and 2 seconds
+    srand(GetProcessId())
+    Sleep(Rand() % 3)
+    Print("P" + GetProcessId() + ": Just bought chips!\n")
+
+// Eat and drink function
+PROCEDURE eat_and_drink()
+    Print("P" + GetProcessId() + ": Eating and drinking!\n")
+
+// Barrier function
+PROCEDURE barrier()
+    // Increment the number of processes that have arrived at the barrier, atomically
+    Wait(sem_nproc)
+    shm.barrier_procs++
+    Signal(sem_nproc)
+
+    // Check if all processes have arrived at the barrier
+    IF shm.barrier_procs = NUM_PROCESSES THEN
+        Signal(sem_barrier)
+    END IF
+
+    Wait(sem_barrier)
+    Signal(sem_barrier)
+
+// Padrão de sincronização: barreira
+PROCEDURE main()
+    pid: Process ID
+
+    // Create the semaphores for the chips and for the beer
+    sem_nproc = CreateSemaphore("semprocs", 1)
+    sem_barrier = CreateSemaphore("sembarrier", 0)
+
+    // Create shared memory area
+    data_size = SizeOf(ShmData)
+    fd = CreateSharedMemory("/shm_procs", data_size)
+    IF fd = -1 THEN
+        PrintError("Error opening file for writing")
+        ExitProgram(EXIT_FAILURE)
+    END IF
+
+    IF TruncateSharedMemory(fd, data_size) = -1 THEN
+        PrintError("Error calling ftruncate()")
+        ExitProgram(EXIT_FAILURE)
+    END IF
+
+    shm = MapSharedMemory(fd, data_size)
+    IF shm = MAP_FAILED THEN
+        PrintError("Error mmapping the file")
+        ExitProgram(EXIT_FAILURE)
+    END IF
+    // END Create shared memory area
+
+    // Initialize the number of processes that have arrived at the barrier
+    shm.barrier_procs = 0
+
+    // Fork the processes
+    FOR i = 0 TO NUM_PROCESSES - 1 DO
+        pid = ForkChild()
+        IF pid = 0 THEN
+            // Randomly decide if the process buys beer or chips
+            srand(GetProcessId())
+            choice = Rand() % 2
+            IF choice = 0 THEN
+                buy_beer()
+            ELSE
+                buy_chips()
+            END IF
+
+            // Wait for all processes to arrive at the barrier
+            barrier()
+
+            // Process eats and drinks
+            eat_and_drink()
+
+            ExitProcess(EXIT_SUCCESS)
+        END IF
+    END FOR
+
+    // Wait for all child processes to complete
+    FOR i = 0 TO NUM_PROCESSES - 1 DO
+        WaitForChild(NULL)
+    END FOR
+
+    // Close and unlink the semaphores
+    CloseSemaphore(sem_nproc)
+    UnlinkSemaphore("semprocs")
+    CloseSemaphore(sem_barrier)
+    UnlinkSemaphore("sembarrier")
+
+    // Close and unlink the shared memory
+    CloseSharedMemory(fd)
+    UnlinkSharedMemory("/shm_procs")
+
+    ExitProgram(0)
+``

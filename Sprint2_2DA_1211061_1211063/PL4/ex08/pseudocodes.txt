@@ -1,0 +1,217 @@
+Padrões:
+Os padrões utilizados na resolução deste problema foram o do Produtor/Consumidor e a Sincronização de Execução.
+
+Pseudocódigo:
+
+insert.c:
+
+STRUCT record
+    INT number
+    CHAR name[NAME_SIZE]
+    CHAR address[ADDRESS_SIZE]
+END STRUCT
+
+STRUCT record_logs
+    record records[MAX_RECORDS]
+    INT identification_number
+END STRUCT
+
+FUNCTION insert()
+    INT data_size = sizeof(record_logs)
+    INT fd = shm_open("/shmtest", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+    ftruncate(fd, data_size)
+    record_logs *ptr = (record_logs*)mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+     
+    sem_t *sem
+    IF sem = sem_open("/sem_ex08_insert", O_CREAT | O_EXCL, 0644, 1) == SEM_FAILED THEN
+        PRINT "Error at sem_open()."
+        EXIT with failure
+    END IF
+
+    down(sem)
+
+    size_t buffer_size = 255
+    CHAR *buffer = calloc(buffer_size, sizeof(CHAR))
+
+    PRINT "\nUSER'S IDENTIFICATION NUMBER: " + (ptr->identification_number+1)
+
+    PRINT "INSERT NAME: "
+    GETLINE(buffer, buffer_size, stdin)
+    strncpy(ptr->records[ptr->identification_number].name, buffer, NAME_SIZE-1)
+    ptr->records[ptr->identification_number].name[strlen(ptr->records[ptr->identification_number].name) - 1] = '\0'
+
+    PRINT "INSERT ADDRESS: "
+    GETLINE(buffer, buffer_size, stdin)
+    ptr->records[ptr->identification_number].number = ptr->identification_number
+    strncpy(ptr->records[ptr->identification_number].address, buffer, ADDRESS_SIZE-1)
+    ptr->records[ptr->identification_number].address[strlen(ptr->records[ptr->identification_number].address) - 1] = '\0'
+
+    PRINT "INSERT NUMBER: "
+    SCANF("%d%*c", &ptr->records[ptr->identification_number].number)
+
+    ptr->identification_number++
+
+    up(sem)
+
+    munmap(ptr, data_size)
+    close(fd)
+
+    sem_close(sem)
+    sem_unlink("/sem_ex08_insert")
+
+    RETURN SUCCESS
+END FUNCTION
+
+consult.c:
+DEFINE NAME_SIZE 50
+DEFINE ADDRESS_SIZE 100
+DEFINE MAX_RECORDS 100
+
+STRUCT record
+    INT number
+    CHAR name[NAME_SIZE]
+    CHAR address[ADDRESS_SIZE]
+END STRUCT
+
+STRUCT record_logs
+    record records[MAX_RECORDS]
+    INT identification_number
+END STRUCT
+
+FUNCTION consult()
+    INT data_size = sizeof(record_logs)
+    INT fd = shm_open("/shmtest", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+    ftruncate(fd, data_size)
+    record_logs *ptr = (record_logs *)mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+
+    sem_t *sem
+    IF sem = sem_open("/sem_ex08_consult", O_CREAT | O_EXCL, 0644, 1) == SEM_FAILED THEN
+        PRINT "Error at sem_open()."
+        EXIT with failure
+    END IF
+
+    down(sem)
+
+    INT selected_identification_number
+    PRINT "\nInsert the identification number associated to the record you want to search: "
+    SCANF("%d", &selected_identification_number)
+    selected_identification_number--
+
+    IF ptr->identification_number <= 0 THEN
+        PRINT "\nThere are no records to consult!"
+    END IF
+
+    IF selected_identification_number >= ptr->identification_number OR selected_identification_number < 0 THEN
+        PRINT "\nRecord not found!"
+    ELSE
+        PRINT "\n\nRecord found!"
+        PRINT "RECORD DATA:"
+        PRINT "Name: " + ptr->records[selected_identification_number].name
+        PRINT "Address: " + ptr->records[selected_identification_number].address
+        PRINT "Identification number: " + ptr->records[selected_identification_number].number
+    END IF
+
+    up(sem)
+
+    munmap(ptr, data_size)
+    close(fd)
+
+    sem_close(sem)
+    sem_unlink("/sem_ex08_consult")
+
+    RETURN SUCCESS
+END FUNCTION
+
+
+consult_all.c:
+
+DEFINE NAME_SIZE 50
+DEFINE ADDRESS_SIZE 100
+DEFINE MAX_RECORDS 100
+
+STRUCT record
+    INT number
+    CHAR name[NAME_SIZE]
+    CHAR address[ADDRESS_SIZE]
+END STRUCT
+
+STRUCT record_logs
+    record records[MAX_RECORDS]
+    INT identification_number
+END STRUCT
+
+FUNCTION consultAll()
+    INT data_size = sizeof(record_logs)
+    INT fd = shm_open("/shmtest", O_CREAT | O_RDWR,S_IRUSR | S_IWUSR)
+    ftruncate(fd, data_size)
+    record_logs *ptr = (record_logs*)mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+
+    sem_t *sem
+    IF sem = sem_open("/sem_ex08_consult_all", O_CREAT | O_EXCL, 0644, 1) == SEM_FAILED THEN
+        PRINT "Error at sem_open()."
+        EXIT with failure
+    END IF
+
+    down(sem)
+
+    IF ptr->identification_number <=0 THEN
+        PRINT "\nThere are no records to consult!"
+    END IF
+
+    FOR i = 0 TO ptr->identification_number-1
+        PRINT "\n\nRECORD DATA"
+        PRINT "Record Identification Number: " + (i+1)
+        PRINT "Name: " + ptr->records[i].name
+        PRINT "Address: " + ptr->records[i].address
+        PRINT "Number: " + ptr->records[i].number
+        sleep(1)
+    END FOR
+
+    up(sem)
+
+    munmap(ptr, data_size)
+    close(fd)
+
+    sem_close(sem)
+    sem_unlink("/sem_ex08_consult_all")
+
+    RETURN SUCCESS
+END FUNCTION
+
+
+main.c:
+
+FUNCTION main()
+    INT option
+    WHILE true DO
+        PRINT "\n-----MENU-----"
+        PRINT "1 - Insert"
+        PRINT "2 - Consult"
+        PRINT "3 - Consult All"
+        PRINT "\n0 - Exit"
+        PRINT "\nOption: "
+        SCANF("%d%*c", &option)
+
+        SWITCH option DO
+            CASE 1:
+                insert()
+                BREAK
+            CASE 2:
+                consult()
+                BREAK
+            CASE 3:
+                consultAll()
+                BREAK
+            CASE 0:
+                PRINT "\nExiting..."
+                shm_unlink("/shmtest")
+                sleep(2)
+                RETURN 0
+            DEFAULT:
+                PRINT "\nInvalid Option!"
+                BREAK
+        END SWITCH
+    END WHILE
+
+    RETURN SUCCESS
+END FUNCTION

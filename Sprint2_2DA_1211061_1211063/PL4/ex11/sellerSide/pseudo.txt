@@ -1,0 +1,68 @@
+// Constants
+constant SEM_SELLER_AVAILABILITY_NAME = "/sem_seller_availibility"
+constant SEM_TICKET_BOUGHT_NAME = "/sem_ticket_bought"
+constant TICKETS_SHM_NAME = "/tickets_shm"
+constant N_TICKETS = 25
+
+// Data Structure
+structure Tickets:
+    integer ticketNumber
+
+// Main Function
+function main():
+    // Creating the semaphore
+    sem_seller_availibility = create_semaphore(SEM_SELLER_AVAILABILITY_NAME, 0)
+    if sem_seller_availibility is failed:
+        print "Error: The seller couldn't create the seller availability semaphore!"
+        exit
+
+    sem_ticket_bought = create_semaphore(SEM_TICKET_BOUGHT_NAME, 0)
+    if sem_ticket_bought is failed:
+        print "Error: The seller couldn't create the ticket bought semaphore!"
+        exit
+
+    // Create the shared memory for the tickets
+    data_size = size_of(Tickets)
+
+    fd = create_shared_memory(TICKETS_SHM_NAME)
+    if fd is -1:
+        print "Error: Seller couldn't create shared memory area!"
+        exit
+
+    ftruncate(fd, data_size)
+    if ftruncate(fd, data_size) is failed:
+        print "Error: Seller couldn't truncate shared memory area!"
+        exit
+
+    tickets = map_shared_memory(fd, data_size, READ_WRITE)
+    if tickets is failed:
+        print "Error: Seller couldn't map shared memory area!"
+        exit
+
+    print "### SELLER: Tickets are now available for sale! ###"
+
+    // Selling tickets until there are no more tickets
+    for i = 1 to N_TICKETS:
+        tickets.ticketNumber = i
+
+        // Notify the buyer that there is a ticket available
+        signal_semaphore(sem_seller_availibility)
+
+        // Wait for the buyer to buy the ticket
+        wait_for_semaphore(sem_ticket_bought)
+
+    // Tickets ended
+    print "### SELLER: Tickets are now sold out! Come back next time! ###"
+
+    // Close the semaphores
+    close_semaphore(sem_seller_availibility)
+    close_semaphore(sem_ticket_bought)
+
+    // Unlink the semaphores
+    unlink_semaphore(SEM_SELLER_AVAILABILITY_NAME)
+    unlink_semaphore(SEM_TICKET_BOUGHT_NAME)
+
+    // Unlink the shared memory
+    unlink_shared_memory(TICKETS_SHM_NAME)
+
+    return 0

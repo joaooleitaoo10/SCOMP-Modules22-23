@@ -1,0 +1,9 @@
+a) The output order may vary each time we ran the code, though it will always be printed:
+1. x = 2;
+2. x = 0;
+Meaning that when the code is being executed in the parent proccess, it will be printed the 1st option and when the
+code is being executed in the child's proccess it will be printed the 2nd..
+
+b)
+No, we have no way to guarantee that since that after the fork() we can't be sure which proccess will run the print
+first.

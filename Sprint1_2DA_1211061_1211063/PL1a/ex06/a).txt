@@ -1,0 +1,4 @@
+Vão ser criados 2^4 processos ou seja 16 processos.
+
+EXTRA PARA RETENÇÃO DE INFORMAÇÃO:
+Se existisse a instrução exit(n) dentro do if, já seriam apenas 4 processos, pois os filhos não iam criar processos filho.  

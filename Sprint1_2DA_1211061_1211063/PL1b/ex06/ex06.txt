@@ -1,0 +1,1 @@
+Variáveis global e static são partilhadas por todas as funções de um programa, logo podem ser modificadas a qualquer momento, até mesmo enquanto o handler está em execução, podendo vários processos modificar a mesma variável ao mesmo tempo. Posto isto a melhor opção seria a utilização de variáveis locais.

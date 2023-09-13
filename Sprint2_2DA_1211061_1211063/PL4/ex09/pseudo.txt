@@ -1,0 +1,50 @@
+PROCEDURE main(argc, argv)
+    // Assure that the user has provided the correct number of arguments
+    IF argc != 3 THEN
+        Print("Usage: " + argv[0] + " {nProcesses} {timeOfWork}\n")
+        ExitProgram(EXIT_FAILURE)
+    END IF
+
+    // Split the arguments
+    nProcesses = ConvertToInt(argv[1])
+    timeOfWork = ConvertToInt(argv[2])
+
+    Print("\033[0;31mNumber of processes: " + nProcesses + " --- Time of the work: " + timeOfWork + " \033[0;37m\n")
+
+    start_time, end_time: Timespec
+    execution_time: Integer
+
+    // Start time
+    GetMonotonicTime(start_time)
+
+    pid: Process ID
+    // Create the worker processes
+    FOR i = 0 TO nProcesses - 1 DO
+        pid = ForkChild()
+        IF pid = 0 THEN
+            BREAK
+        END IF
+    END FOR
+
+    IF pid = 0 THEN
+        Print("\033[0;35mProcess " + GetProcessId() + ": Im working!!!\n\033[0;37m")
+        usleep(timeOfWork) // If the goal is to split the work between the processes, add  " / nProcesses"
+        Print("\033[0;32mProcess " + GetProcessId() + ": Im done!!!\n\033[0;37m")
+        ExitProcess(EXIT_SUCCESS)
+    END IF
+
+    FOR i = 0 TO nProcesses - 1 DO
+        WaitForChild(NULL)
+    END FOR
+
+    // End time
+    GetMonotonicTime(end_time)
+
+    // Calculate execution time
+    execution_time = (end_time.tv_sec - start_time.tv_sec) * 1000000
+    execution_time += (end_time.tv_nsec - start_time.tv_nsec) / 1000
+
+    // Print the execution time
+    Print("\033[0;34mExecution time: " + execution_time + " milliseconds\n\033[0;37m")
+
+    ExitProgram(0)

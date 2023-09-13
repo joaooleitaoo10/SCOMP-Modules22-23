@@ -1,0 +1,65 @@
+PROCEDURE main():
+    // Declare the necessary variables
+    pid1, pid2, pid3: Process IDs
+    sem1, sem2, sem3: Semaphores
+
+    // Create the semaphores
+    sem1 = CreateSemaphore("sem1", 1)
+    sem2 = CreateSemaphore("sem2", 0)
+    sem3 = CreateSemaphore("sem3", 0)
+
+    // Check if the semaphores were created successfully
+    IF sem1 = SEM_FAILED OR sem2 = SEM_FAILED OR sem3 = SEM_FAILED THEN
+        PrintError("Error creating the semaphores")
+        ExitProgram(EXIT_FAILURE)
+
+    // 1st child (Sistemas ) + (a )
+    pid1 = ForkChild()
+    IF pid1 = 0 THEN
+        Wait(sem1)
+        Print("Sistemas ")
+        FlushOutput()
+        Signal(sem2)
+        Wait(sem1)
+        Print("a ")
+        FlushOutput()
+        Signal(sem2)
+        ExitProcess(EXIT_SUCCESS)
+
+    // 2nd child (de ) + (melhor )
+    pid2 = ForkChild()
+    IF pid2 = 0 THEN
+        Wait(sem2)
+        Print("de ")
+        FlushOutput()
+        Signal(sem3)
+        Wait(sem2)
+        Print("melhor ")
+        FlushOutput()
+        Signal(sem3)
+        ExitProcess(EXIT_SUCCESS)
+
+    // 3rd child (Computadores - ) + (disciplina! )
+    pid3 = ForkChild()
+    IF pid3 = 0 THEN
+        Wait(sem3)
+        Print("Computadores - ")
+        FlushOutput()
+        Signal(sem1)
+        Wait(sem3)
+        Print("disciplina!\n")
+        ExitProcess(EXIT_SUCCESS)
+
+    // Wait for child processes to complete
+    FOR i = 0 TO 2 DO
+        WaitForChild(NULL)
+
+    // Close and unlink the semaphores
+    CloseSemaphore(sem1)
+    CloseSemaphore(sem2)
+    CloseSemaphore(sem3)
+    UnlinkSemaphore("sem1")
+    UnlinkSemaphore("sem2")
+    UnlinkSemaphore("sem3")
+
+    ExitProgram(0)

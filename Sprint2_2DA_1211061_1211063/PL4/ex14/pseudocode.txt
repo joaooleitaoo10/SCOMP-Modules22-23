@@ -1,0 +1,129 @@
+Padrões:
+Barreiras e Sincronização de Execução
+
+Pseudocódigo:
+
+// Constants
+DEFINE NUM_INTEGERS = 10
+DEFINE NUM_AX_PROCESSES = 3
+DEFINE NUM_BX_PROCESSES = 2
+DEFINE NUM_PROCESSES = 5
+
+// Struct definition
+STRUCT SharedMemory
+    INT numbers[NUM_INTEGERS]
+    INT ax_num_execs
+    INT bx_num_execs
+END STRUCT
+
+FUNCTION main()
+    // Create shared memory
+    INT data_size = size_of(SharedMemory)
+    INT fd = shm_open("/shm_test", O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR)
+    ftruncate(fd, data_size)
+    SharedMemory *shared_memory = (SharedMemory *)mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)
+
+    // Create semaphores
+    SEMAPHORE mutex_numbers // Allows access to the numbers array by multiple processes
+    SEMAPHORE mutex_num_execs // Allows access to the number of executions by multiple processes
+    SEMAPHORE sem_barrier // Barrier that ensures execution alternation between ax and bx processes
+
+    IF sem_open("/mutex_numbers", O_CREAT | O_EXCL, 0644, 1) == SEM_FAILED THEN
+        PRINT "Error at sem_open()!"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/mutex_num_execs", O_CREAT | O_EXCL, 0644, 1) == SEM_FAILED THEN
+        PRINT "Error at sem_open()!"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    IF sem_open("/sem_barrier", O_CREAT | O_EXCL, 0644, 0) == SEM_FAILED THEN
+        PRINT "Error at sem_open()!"
+        EXIT(EXIT_FAILURE)
+    END IF
+
+    // Variable initializations
+    pid_t pid
+    shared_memory->ax_num_execs = 0
+    shared_memory->bx_num_execs = 0
+
+    FOR i = 0 TO NUM_PROCESSES
+        IF fork() == -1 THEN
+            PRINT "Error at fork()!"
+            EXIT(EXIT_FAILURE)
+        END IF
+
+        IF pid == 0 THEN
+            IF (i + 1) <= NUM_AX_PROCESSES THEN
+                // Wait for mutex_numbers to be available
+                down(mutex_numbers)
+                PRINT "AX Wrote:"
+
+                FOR j = 0 TO NUM_INTEGERS
+                    shared_memory->numbers[j] = rand() % 100
+                    PRINT shared_memory->numbers[j]
+                END FOR
+
+                // Release mutex_numbers
+                up(mutex_numbers)
+                down(mutex_num_execs)
+
+                // Increment ax_num_execs
+                shared_memory->ax_num_execs++
+
+                // If 3 ax executions have completed, release the barrier
+                IF shared_memory->ax_num_execs == 3 THEN
+                    up(sem_barrier)
+                END IF
+
+                // Release mutex_num_execs
+                up(mutex_num_execs)
+            ELSE IF (i + 1) > NUM_AX_PROCESSES THEN
+                // Wait for the barrier to be released
+                down(sem_barrier)
+
+                // Release the barrier to allow the last Bx process to execute
+                up(sem_barrier)
+
+                // Wait for mutex_numbers to be available
+                down(mutex_numbers)
+
+                PRINT "BX Wrote:"
+
+                FOR j = 0 TO NUM_INTEGERS
+                    shared_memory->numbers[j] = rand() % 100
+                    PRINT shared_memory->numbers[j]
+                END FOR
+
+                // Sleep for 6 seconds after writing the numbers
+                sleep(6)
+
+                // Release mutex_numbers
+                up(mutex_numbers)
+            END IF
+
+            EXIT(EXIT_SUCCESS)
+        END IF
+    END FOR
+
+    // Wait for child processes to finish
+    FOR i = 0 TO NUM_PROCESSES
+        wait(NULL)
+    END FOR
+
+    // Close shared memory
+    munmap(shared_memory, data_size)
+    close(fd)
+    shm_unlink("/shm_test")
+
+    // Close semaphores
+    sem_close(mutex_numbers)
+    sem_unlink("/mutex_numbers")
+    sem_close(mutex_num_execs)
+    sem_unlink("/mutex_num_execs")
+    sem_close(sem_barrier)
+    sem_unlink("/sem_barrier")
+
+    RETURN SUCCESS
+END FUNCTION
